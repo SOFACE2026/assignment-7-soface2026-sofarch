@@ -19,6 +19,12 @@ public:
     // multiply elements with a constant factor on the calling thread
     void multiply_single_threaded(T factor)
     {
+        // iterate through data matrix
+        for (auto &value : this->data)
+        {
+            // multiply each datapoint by the factor
+            value *= factor;
+        }
     }
 
     // split the matrix in n parts and use multiple spawn one thread per paSrtition to perform the multiplication.
@@ -56,8 +62,19 @@ public:
         std::vector<std::thread> workers;
         for (auto &t : slices)
         {
-            // IMPLEMENT THIS
-            // spawn new thread for each partition, to carry out the `multiply_slice` function.
+            // fetch start and end from current tuple
+            auto start = std::get<0>(t);
+            auto end = std::get<1>(t);
+
+            // std::thread(function, arg1, arg2, arg3,...) starts a new thread and runs function(arg1, arg2, arg3,...)
+            // this allows us to continue in this script while letting the thread resolve so we can run multiple things
+            // at the same time. You have to store the threads otherwise they autoterminate so we store it in workers
+            workers.push_back(std::thread(multiply_slice, factor, start, end));
+            // as we loop through each segment and queue up the threads the cpu begins resolving them 
+            // but the main thread moves on and queue up the next till we are done queueing
+
+            // mutex is not needed because each thread acces different area of memory so there shoud never be a case
+            // where two threads try to manipulate the same variable
         }
 
         // 3) It is important that the `iterators` vector used witin the thread is not freed prematurely
@@ -65,7 +82,12 @@ public:
         // this ensures that the full computation is done when this function returns
         for (auto &worker : workers)
         {
-            // IMPLEMENT THIS
+            // if we destroy the object containing the threads they call std::terminate which closes the exe
+            // so we have to free them properly so we can continue running the script so we have to join them
+            // we do this here because once we join the main thread waits till the thread is resolved before
+            // then removing it so we have to queue up all threads before we begin joining them but now that 
+            // they are queued up waiting isn't an issue they will all run as the OS schedule dictates
+            worker.join();
         }
     }
 
@@ -125,9 +147,13 @@ private:
     // this is a static method since it needs to be passed to a thread
     static void multiply_slice(T factor, typename std::vector<T>::iterator &begin, typename std::vector<T>::iterator &end)
     {
-        for (auto &it = begin; it != end; ++it)
+        // we have been passed an iterator for the beginning and the end
+        // so we set the start to be the beginning and then iterate over
+        // it by simply adding to the iterator
+        for (auto it = begin; it != end; ++it)
         {
-            // IMPLEMENT THIS
+            // dereference current position and multiply by factor
+            (*it) *= factor;
         }
     }
 };
